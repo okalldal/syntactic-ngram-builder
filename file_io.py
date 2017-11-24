@@ -27,7 +27,7 @@ class TarReader(object):
         counter=0
         tar=tarfile.open(self.fName)
         for tarInfo in tar:
-            if not tarInfo.name.endswith(u".gz"):
+            if not tarInfo.name.endswith(u".gz") or tarInfo.name.endswith(u".xz"):
                 continue
             print >> sys.stdout, tarInfo.name
             try:
@@ -64,13 +64,14 @@ class FileReader(object):
         """ inp can be one file or directory with multiple files. """
         if os.path.isdir(inp): # inp is directory
             files=glob.glob(os.path.join(inp,"*.gz"))
+            files+=glob.glob(os.path.join(inp,"*.xz"))
             files+=glob.glob(os.path.join(inp,"*.conll09"))
             files+=glob.glob(os.path.join(inp,"*.conll"))
             files+=glob.glob(os.path.join(inp,"*.conllu"))
             files.sort()
             for fName in files:
                 self.read_file(fName)
-        elif inp.endswith(u".gz") or inp.endswith(u".conll") or inp.endswith(u".conll09") or inp.endswith(u".conllu"): # inp is a gzip or conll file
+        elif inp.endswith(u".gz") or inp.endswith(u".xz") or inp.endswith(u".conll") or inp.endswith(u".conll09") or inp.endswith(u".conllu"): # inp is a gzip or conll file
             self.read_file(inp)
         else:
             raise ValueError(u"Wrong input format.")
@@ -87,12 +88,20 @@ class FileReader(object):
         return p.stdout
 
 
+    def readXz(self,fName):
+        """ Uses multithreaded gzip implementation (pigz) to read gzipped files. """
+        p=subprocess.Popen(("xz","--decompress","--to-stdout",fName),stdout=subprocess.PIPE,stdin=None,stderr=subprocess.PIPE)
+        return p.stdout
+
+
     def read_file(self,fName):
         """ Reads one .gz file and puts sentences into queue. """
         print >> sys.stderr, fName
         if fName.endswith(u".gz"):
             f=codecs.getreader("utf-8")(self.readGzip(fName))
             # f=codecs.getreader("utf-8")(gzip.open(fName)) # TODO use this as a fallback
+        elif fName.endswith(u".xz"):
+            f=codecs.getreader("utf-8")(self.readXz(fName))
         else:
             f=codecs.open(fName,u"rt",u"utf-8")
         sentences=[]
